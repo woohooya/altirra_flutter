@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
 import '../core/emulator.dart';
+import '../core/shortcut_service.dart';
 import 'play_screen.dart';
 import 'settings_screen.dart';
 
@@ -18,6 +19,38 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _emu = Emulator.instance;
   bool _busy = false;
+  bool _canPinShortcuts = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initShortcuts();
+  }
+
+  Future<void> _initShortcuts() async {
+    ShortcutService.instance.listen(_launchFromShortcut);
+    final supported = await ShortcutService.instance.isPinSupported();
+    if (mounted && supported) {
+      setState(() => _canPinShortcuts = true);
+    }
+    final initialPath = await ShortcutService.instance.getInitialGamePath();
+    if (initialPath != null && initialPath.isNotEmpty && mounted) {
+      _launchFromShortcut(initialPath);
+    }
+  }
+
+  Future<void> _launchFromShortcut(String path) async {
+    if (!mounted) return;
+    if (!File(path).existsSync()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('File not found: ${p.basename(path)}')),
+      );
+      return;
+    }
+    // If already in PlayScreen, return to root before launching the new game.
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    await _launch(path);
+  }
 
   Future<void> _launch(String? path) async {
     if (_busy) return;
@@ -56,12 +89,30 @@ class _HomeScreenState extends State<HomeScreen> {
     await _launch(stored);
   }
 
+  Future<void> _pinShortcut(String path) async {
+    final label = p.basenameWithoutExtension(path);
+    final ok = await ShortcutService.instance.pinGameShortcut(
+      path: path,
+      label: label,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'Requested home screen shortcut for "$label"'
+              : 'Home screen shortcuts are not supported on this launcher',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Altirra'),
+        title: const Text('THE Atari 800'),
         actions: [
           IconButton(
             tooltip: 'Settings',
@@ -180,6 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     path: path,
                     exists: File(path).existsSync(),
                     onTap: () => _launch(path),
+                    onPin: _canPinShortcuts ? () => _pinShortcut(path) : null,
                     onRemove: () => _emu.removeRecent(path),
                   ),
             ],
@@ -196,12 +248,14 @@ class _RecentTile extends StatelessWidget {
     required this.exists,
     required this.onTap,
     required this.onRemove,
+    this.onPin,
   });
 
   final String path;
   final bool exists;
   final VoidCallback onTap;
   final VoidCallback onRemove;
+  final VoidCallback? onPin;
 
   @override
   Widget build(BuildContext context) {
@@ -232,10 +286,21 @@ class _RecentTile extends StatelessWidget {
           style: TextStyle(
               fontSize: 11, color: exists ? Colors.white54 : Colors.redAccent),
         ),
-        trailing: IconButton(
-          tooltip: 'Remove',
-          icon: const Icon(Icons.close, size: 18),
-          onPressed: onRemove,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (onPin != null && exists)
+              IconButton(
+                tooltip: 'Pin to Home Screen',
+                icon: const Icon(Icons.add_to_home_screen, size: 20),
+                onPressed: onPin,
+              ),
+            IconButton(
+              tooltip: 'Remove',
+              icon: const Icon(Icons.close, size: 18),
+              onPressed: onRemove,
+            ),
+          ],
         ),
         onTap: exists ? onTap : null,
       ),

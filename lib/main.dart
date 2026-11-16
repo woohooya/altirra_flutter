@@ -15,7 +15,7 @@ class AltirraApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Altirra',
+      title: 'THE Atari 800',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
