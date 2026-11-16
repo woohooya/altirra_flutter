@@ -1,0 +1,3 @@
+[submodule "third_party/AltirraSDL"]
+	path = third_party/AltirraSDL
+	url = https://github.com/ilmenit/AltirraSDL
