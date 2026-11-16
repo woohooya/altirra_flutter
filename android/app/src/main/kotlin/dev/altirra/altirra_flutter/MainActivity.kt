@@ -1,6 +1,8 @@
 package dev.altirra.altirra_flutter
 
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -35,11 +37,12 @@ class MainActivity : FlutterActivity() {
                     "pinGameShortcut" -> {
                         val path = call.argument<String>("path")
                         val label = call.argument<String>("label")
+                        val iconPath = call.argument<String>("iconPath")
                         if (path.isNullOrEmpty() || label.isNullOrEmpty()) {
                             result.success(false)
                             return@setMethodCallHandler
                         }
-                        result.success(pinShortcut(path, label))
+                        result.success(pinShortcut(path, label, iconPath))
                     }
                     else -> result.notImplemented()
                 }
@@ -59,7 +62,24 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun pinShortcut(path: String, label: String): Boolean {
+    private fun buildShortcutIcon(iconPath: String?): IconCompat {
+        if (!iconPath.isNullOrEmpty()) {
+            val raw = BitmapFactory.decodeFile(iconPath)
+            if (raw != null) {
+                val side = minOf(raw.width, raw.height)
+                val x = (raw.width - side) / 2
+                val y = (raw.height - side) / 2
+                val square = Bitmap.createBitmap(raw, x, y, side, side)
+                val scaled = Bitmap.createScaledBitmap(square, 256, 256, true)
+                if (square !== raw) square.recycle()
+                if (scaled !== raw) raw.recycle()
+                return IconCompat.createWithBitmap(scaled)
+            }
+        }
+        return IconCompat.createWithResource(this, R.mipmap.ic_launcher)
+    }
+
+    private fun pinShortcut(path: String, label: String, iconPath: String?): Boolean {
         if (!ShortcutManagerCompat.isRequestPinShortcutSupported(this)) {
             return false
         }
@@ -71,7 +91,7 @@ class MainActivity : FlutterActivity() {
         val shortcut = ShortcutInfoCompat.Builder(this, "game_${path.hashCode()}")
             .setShortLabel(label.take(25))
             .setLongLabel(label)
-            .setIcon(IconCompat.createWithResource(this, R.mipmap.ic_launcher))
+            .setIcon(buildShortcutIcon(iconPath))
             .setIntent(launchIntent)
             .build()
         return ShortcutManagerCompat.requestPinShortcut(this, shortcut, null)

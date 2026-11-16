@@ -90,10 +90,110 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _pinShortcut(String path) async {
-    final label = p.basenameWithoutExtension(path);
+    final defaultLabel = p.basenameWithoutExtension(path);
+    final labelController = TextEditingController(text: defaultLabel);
+    String? customIconPath;
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              4,
+              20,
+              20 + MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Pin to Home Screen',
+                    style: Theme.of(ctx).textTheme.titleMedium),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                        child: customIconPath != null
+                            ? Image.file(
+                                File(customIconPath!),
+                                fit: BoxFit.cover,
+                              )
+                            : const Icon(Icons.videogame_asset, size: 32),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              final files = await FilePicker.pickFiles(
+                                type: FileType.image,
+                              );
+                              if (files.isNotEmpty &&
+                                  files.single.path != null) {
+                                setSheetState(
+                                    () => customIconPath = files.single.path);
+                              }
+                            },
+                            icon: const Icon(Icons.image_outlined, size: 18),
+                            label: const Text('Choose Image'),
+                          ),
+                          if (customIconPath != null)
+                            TextButton(
+                              onPressed: () =>
+                                  setSheetState(() => customIconPath = null),
+                              child: const Text('Use Default'),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: labelController,
+                  maxLength: 25,
+                  decoration: const InputDecoration(
+                    labelText: 'Shortcut Name',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    icon: const Icon(Icons.add_to_home_screen),
+                    label: const Text('Add to Home Screen'),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    final label = labelController.text.trim();
+    labelController.dispose();
+    if (confirmed != true || label.isEmpty) return;
+
     final ok = await ShortcutService.instance.pinGameShortcut(
       path: path,
       label: label,
+      iconPath: customIconPath,
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

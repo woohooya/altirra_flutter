@@ -39,12 +39,14 @@ class ShortcutService {
   Future<bool> pinGameShortcut({
     required String path,
     required String label,
+    String? iconPath,
   }) async {
     if (!Platform.isAndroid) return false;
     try {
       return await _channel.invokeMethod<bool>('pinGameShortcut', {
             'path': path,
             'label': label,
+            if (iconPath != null) 'iconPath': iconPath,
           }) ??
           false;
     } catch (_) {
